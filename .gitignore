@@ -1,0 +1,15 @@
+.venv/
+.env
+deploy/runtime.env
+data/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
