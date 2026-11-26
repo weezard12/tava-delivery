@@ -1,0 +1,272 @@
+name: Teva Delivery CI/CD
+
+on:
+  pull_request:
+    branches: [main, master, dev, develop]
+  push:
+    branches: [main, master, dev, develop]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: Deploy after running checks on the selected branch
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Lint, type check and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m ruff check
+      - run: python -m ruff format --check
+      - run: python -m mypy src tests
+      - run: python -m pytest --cov --cov-report=term
+
+  postgres:
+    name: Tests against PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: delivery_test
+          POSTGRES_USER: delivery
+          POSTGRES_PASSWORD: ci-only-database-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username delivery --dbname delivery_test"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+    env:
+      TEVA_TEST_POSTGRES_URL: postgresql+psycopg://delivery:ci-only-database-password@127.0.0.1:5432/delivery_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version-file: .python-version
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest tests/integration -m postgres -v
+
+  image:
+    name: Build and smoke-test the Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [verify, postgres]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Start Compose in demo mode and wait for health
+        env:
+          COMPOSE_PROJECT_NAME: teva-delivery-ci
+          TEVA_STACK: teva-ci
+          DELIVERY_MODE: demo
+        run: |
+          printf '%s\n' 'DELIVERY_AUTH_DISABLED=true' > deploy/runtime.env
+          docker network create "$TEVA_STACK"
+          docker compose -f deploy/compose.yml up --build --pull never --wait --wait-timeout 60
+      - name: Start Compose in live mode against PostgreSQL, before any provider key exists
+        env:
+          COMPOSE_PROJECT_NAME: teva-delivery-ci-live
+          TEVA_STACK: teva-ci-live
+          TEVA_DB_NETWORK: teva-ci-db
+          DELIVERY_MODE: live
+        run: |
+          cat > deploy/runtime.env <<'ENV'
+          DELIVERY_AUTH_URL=http://teva-auth:8002
+          DELIVERY_AUTH_SERVICE_KEY=ci-live-only-service-key-0123456789
+          DELIVERY_POSTGRES_HOST=ci-postgres
+          DELIVERY_POSTGRES_DATABASE=delivery
+          DELIVERY_POSTGRES_USER=delivery
+          DELIVERY_POSTGRES_PASSWORD=ci-only-database-password
+          ENV
+          docker network create "$TEVA_STACK"
+          docker network create "$TEVA_DB_NETWORK"
+          docker run --detach --name ci-postgres --network "$TEVA_DB_NETWORK" \
+            --env POSTGRES_DB=delivery --env POSTGRES_USER=delivery \
+            --env POSTGRES_PASSWORD=ci-only-database-password postgres:17-alpine
+          for _ in $(seq 30); do
+            docker exec ci-postgres pg_isready --host 127.0.0.1 --username delivery --dbname delivery && break
+            sleep 1
+          done
+          docker compose -f deploy/compose.yml -f deploy/compose.database.yml \
+            up --build --pull never --wait --wait-timeout 60
+      - name: Show the live-mode container log
+        if: failure()
+        env:
+          COMPOSE_PROJECT_NAME: teva-delivery-ci-live
+          TEVA_STACK: teva-ci-live
+          DELIVERY_MODE: live
+        run: |
+          docker compose -f deploy/compose.yml -f deploy/compose.database.yml logs --no-color --tail 80 delivery || true
+
+  stt:
+    name: Build the speech recognition image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: docker build --pull stt
+
+  deploy:
+    name: Deploy to the Docker server
+    if: ((github.event_name == 'push' && !github.event.deleted && !github.event.created) || (github.event_name == 'workflow_dispatch' && inputs.deploy)) && contains(fromJSON('["main","master","dev","develop"]'), github.ref_name)
+    needs: [image, stt]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'production' || 'staging' }}
+    concurrency:
+      group: deploy-${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'production' || 'staging' }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install and verify cloudflared
+        run: |
+          # Match the workspace runner's version; 2026.6.0 regressed Access SSH.
+          version=2026.5.1
+          if [[ $(cloudflared --version 2>/dev/null) != "cloudflared version $version "* ]]; then
+            case "$RUNNER_ARCH" in
+              X64) asset=cloudflared-linux-amd64
+                   checksum=3c6a5ba995a258dbe90f98e5fdb2c2620b7be72c3ca761614f6eb52aee252cea ;;
+              ARM64) asset=cloudflared-linux-arm64
+                     checksum=7b7a8b9a2764acab0fecda633cb54a6c0df42d7f8ca1ec45c78333c2227d8d91 ;;
+              *) echo '::error::Unsupported runner architecture for cloudflared.'; exit 1 ;;
+            esac
+            install_dir=$(mktemp -d "$RUNNER_TEMP/cloudflared.XXXXXX")
+            curl --fail --silent --show-error --location --proto '=https' --proto-redir '=https' \
+              --retry 2 --connect-timeout 10 --max-time 60 \
+              "https://github.com/cloudflare/cloudflared/releases/download/$version/$asset" \
+              --output "$install_dir/cloudflared"
+            if ! printf '%s  %s\n' "$checksum" "$install_dir/cloudflared" | sha256sum --check --status; then
+              echo '::error::cloudflared download did not match its release checksum.'
+              exit 1
+            fi
+            chmod 0755 "$install_dir/cloudflared"
+            export PATH="$install_dir:$PATH"
+            printf '%s\n' "$install_dir" >> "$GITHUB_PATH"
+          fi
+          if [[ $(cloudflared --version) != "cloudflared version $version "* ]]; then
+            echo '::error::The pinned cloudflared version is unavailable.'
+            exit 1
+          fi
+          cloudflared --version
+      - name: Configure the deployment SSH context
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          : "${TUNNEL_SERVICE_TOKEN_ID:?Set CF_ACCESS_CLIENT_ID in the GitHub environment}"
+          : "${TUNNEL_SERVICE_TOKEN_SECRET:?Set CF_ACCESS_CLIENT_SECRET in the GitHub environment}"
+          : "${DEPLOY_SSH_KEY:?Set DEPLOY_SSH_KEY in the GitHub environment}"
+          : "${DEPLOY_KNOWN_HOSTS:?Set DEPLOY_KNOWN_HOSTS in the GitHub environment}"
+          user=${DEPLOY_USER:-rimon}
+          port=${DEPLOY_PORT:-22}
+          if [[ ! $user =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]*$ ||
+                ! $port =~ ^[0-9]{1,5}$ ]] || (( 10#$port < 1 || 10#$port > 65535 )); then
+            echo 'Invalid deployment SSH user or port.' >&2
+            exit 1
+          fi
+
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" | sed 's/\r$//' > "$HOME/.ssh/rimon_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | sed 's/\r$//' > "$HOME/.ssh/rimon_known_hosts"
+          cat > "$HOME/.ssh/config" <<EOF
+          Host rimon-deploy ssh.rimon-studios.top
+            HostName ssh.rimon-studios.top
+            User $user
+            Port $port
+            ProxyCommand cloudflared access ssh --hostname %h --log-level error
+            IdentityFile ~/.ssh/rimon_deploy
+            UserKnownHostsFile ~/.ssh/rimon_known_hosts
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ConnectTimeout 15
+            ServerAliveInterval 15
+            ServerAliveCountMax 3
+            ControlMaster auto
+            ControlPath ~/.ssh/rimon-%C
+            ControlPersist 60s
+          EOF
+          if ! timeout --kill-after=5s 30s ssh -n -T rimon-deploy true; then
+            echo '::error::SSH preflight through Cloudflare Access failed. Check the Service Auth policy, service token, SSH key, and pinned host key.'
+            exit 1
+          fi
+          docker context create rimon --docker host=ssh://rimon-deploy
+      - name: Build and deploy with Compose
+        env:
+          COMPOSE_PROJECT_NAME: teva-delivery-${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'production' || 'staging' }}
+          TEVA_STACK: teva-${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'production' || 'staging' }}
+          DELIVERY_MODE: ${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'live' || 'demo' }}
+          # The Docker network of the PostgreSQL container. Defaults to teva-db.
+          TEVA_DB_NETWORK: ${{ vars.TEVA_DB_NETWORK }}
+          RUNTIME_ENV: ${{ secrets.RUNTIME_ENV }}
+          TUNNEL_SERVICE_TOKEN_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          TUNNEL_SERVICE_TOKEN_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          : "${RUNTIME_ENV:?Set RUNTIME_ENV in the GitHub environment}"
+          umask 077
+          printf '%s\n' "$RUNTIME_ENV" | sed 's/\r$//' > deploy/runtime.env
+          if [[ $DELIVERY_MODE == live ]] && ! awk -F= '
+            $1 == "DELIVERY_AUTH_URL" { url = length($0) > length($1) + 1 }
+            $1 == "DELIVERY_AUTH_SERVICE_KEY" { key = length($0) > length($1) + 1 }
+            $1 == "DELIVERY_POSTGRES_HOST" { db = length($0) > length($1) + 1 }
+            END { exit !(url && key && db) }
+          ' deploy/runtime.env; then
+            echo 'Live mode needs DELIVERY_AUTH_URL, DELIVERY_AUTH_SERVICE_KEY and DELIVERY_POSTGRES_* in RUNTIME_ENV.' >&2
+            exit 1
+          fi
+          unset DOCKER_HOST
+          if ! timeout 30s docker --context rimon info --format 'Deployment Docker daemon {{.Name}}'; then
+            echo '::error::Cannot reach the deployment Docker daemon through Cloudflare SSH. Check SSH and Docker socket access.'
+            exit 1
+          fi
+          docker --context rimon network inspect "$TEVA_STACK" >/dev/null 2>&1 ||
+            docker --context rimon network create "$TEVA_STACK" >/dev/null ||
+            docker --context rimon network inspect "$TEVA_STACK" >/dev/null
+          compose=(docker --context rimon compose -f deploy/compose.yml)
+          if grep -Eq '^DELIVERY_POSTGRES_HOST=[^[:space:]]' deploy/runtime.env; then
+            compose+=(-f deploy/compose.database.yml)
+          fi
+          if grep -Eq '^DELIVERY_STT_URL=[^[:space:]]' deploy/runtime.env; then
+            compose+=(-f deploy/compose.stt.yml)
+            # The speech service gets only its own token, never the rest of runtime.env.
+            STT_TOKEN=$(awk 'index($0, "DELIVERY_STT_TOKEN=") == 1 { print substr($0, 20) }' deploy/runtime.env)
+            export STT_TOKEN
+          fi
+          if ! "${compose[@]}" up --build --pull never --wait --wait-timeout 90; then
+            echo '::group::Container state and recent log'
+            "${compose[@]}" ps --all || true
+            "${compose[@]}" logs --no-color --tail 80 delivery || true
+            echo '::endgroup::'
+            echo '::error::The warehouse service did not become healthy. The container log is above.'
+            exit 1
+          fi
