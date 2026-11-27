@@ -1,0 +1,26 @@
+# The warehouse service on the workspace network, where the frontend's nginx reaches it as
+# teva-delivery:8000 under /services/delivery/. Settings come from runtime.env (TEVA_*).
+services:
+  delivery:
+    build: ..
+    restart: unless-stopped
+    stop_grace_period: 30s
+    env_file:
+      - path: ./runtime.env
+        format: raw
+    environment:
+      TEVA_MODE: ${TEVA_MODE:?Set live or demo mode}
+    volumes:
+      - delivery-data:/data
+    networks:
+      workspace:
+        aliases:
+          - teva-delivery
+
+volumes:
+  delivery-data:
+
+networks:
+  workspace:
+    name: ${TEVA_STACK:?Set the Teva workspace network}
+    external: true
