@@ -1,5 +1,5 @@
 # Adds the service to the Docker network of its PostgreSQL server. The deploy workflow loads
-# this file when runtime.env names DELIVERY_POSTGRES_HOST. TEVA_DB_NETWORK overrides the name.
+# this file when runtime.env names TEVA_POSTGRES_HOST. TEVA_DB_NETWORK overrides the name.
 services:
   delivery:
     networks:

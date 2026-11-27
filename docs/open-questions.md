@@ -33,10 +33,10 @@ be read from the order.
 
 ## Keys and access
 
-- Konimbo API token (`DELIVERY_KONIMBO_TOKEN`).
-- Cargo API token and customer codes (`DELIVERY_CARGO_TOKEN`, `_CUSTOMER_CODE_EXPRESS`, `_BOX`).
+- Konimbo API token (`TEVA_KONIMBO_TOKEN`).
+- Cargo API token and customer codes (`TEVA_CARGO_TOKEN`, `_CUSTOMER_CODE_EXPRESS`, `_BOX`).
 - The workspace sign-in key (`TEVA_AUTH_DELIVERY_KEY` in teva-media-master, the same value as
-  `DELIVERY_AUTH_SERVICE_KEY`).
+  `TEVA_AUTH_SERVICE_KEY`).
 - Optional: an Anthropic API key for the AI fallback.
 
 ## To confirm with the warehouse

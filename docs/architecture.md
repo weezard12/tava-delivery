@@ -16,7 +16,7 @@ teva-frontend (warehouse module) ──/services/delivery/──▶ teva-deliver
 
 `src/teva_delivery/` follows teva-printer's layout:
 
-- `core/`: settings (`DELIVERY_*`), logging, the clock.
+- `core/`: settings (`TEVA_*`), logging, the clock.
 - `domain/`: pure rules with no I/O. The Hebrew parser (`hebrew/`), note classification,
   address splitting, duplicate grouping, packing rules and state transitions, error codes and
   their Hebrew messages, and the provider ports.

@@ -1,4 +1,4 @@
-"""Service settings, read from DELIVERY_* environment variables.
+"""Service settings, read from TEVA_* environment variables.
 
 Deployments write them from the RUNTIME_ENV secret into deploy/runtime.env, which Compose
 passes to the container. Local development can use a .env file. Secrets are SecretStr, so
@@ -48,7 +48,7 @@ def split_list(value: str) -> tuple[str, ...]:
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_prefix="DELIVERY_", env_file=".env", extra="ignore", hide_input_in_errors=True
+        env_prefix="TEVA_", env_file=".env", extra="ignore", hide_input_in_errors=True
     )
 
     # demo: synthetic orders, fake Cargo and printer, nothing leaves the process.
@@ -193,33 +193,31 @@ class Settings(BaseSettings):
         try:
             ZoneInfo(self.timezone)
         except ZoneInfoNotFoundError, ValueError:
-            raise ValueError("DELIVERY_TIMEZONE must be an IANA time zone.") from None
+            raise ValueError("TEVA_TIMEZONE must be an IANA time zone.") from None
         if 0 < self.sync_interval_seconds < MIN_SYNC_INTERVAL:
             raise ValueError(
-                f"DELIVERY_SYNC_INTERVAL_SECONDS must be 0 or at least {MIN_SYNC_INTERVAL}."
+                f"TEVA_SYNC_INTERVAL_SECONDS must be 0 or at least {MIN_SYNC_INTERVAL}."
             )
         key = self.auth_service_key.get_secret_value()
         if self.auth_url is None:
             if key:
-                raise ValueError("DELIVERY_AUTH_SERVICE_KEY requires DELIVERY_AUTH_URL.")
+                raise ValueError("TEVA_AUTH_SERVICE_KEY requires TEVA_AUTH_URL.")
         else:
             url = self.auth_url
             if url.path not in (None, "/") or any(
                 part is not None for part in (url.username, url.password, url.query, url.fragment)
             ):
-                raise ValueError("DELIVERY_AUTH_URL must be the workspace auth service origin.")
+                raise ValueError("TEVA_AUTH_URL must be the workspace auth service origin.")
             if not _SERVICE_KEY.fullmatch(key):
-                raise ValueError(
-                    "DELIVERY_AUTH_SERVICE_KEY requires 32 to 512 printable characters."
-                )
+                raise ValueError("TEVA_AUTH_SERVICE_KEY requires 32 to 512 printable characters.")
         if self.auth_disabled and self.mode != "demo":
-            raise ValueError("DELIVERY_AUTH_DISABLED is only allowed in demo mode.")
+            raise ValueError("TEVA_AUTH_DISABLED is only allowed in demo mode.")
         if self.mode == "live":
             if self.auth_url is None:
-                raise ValueError("Live mode requires workspace sign-in (DELIVERY_AUTH_URL).")
+                raise ValueError("Live mode requires workspace sign-in (TEVA_AUTH_URL).")
             if not self.postgres_configured:
                 raise ValueError(
-                    "Live mode requires PostgreSQL: set DELIVERY_POSTGRES_HOST, _DATABASE, "
+                    "Live mode requires PostgreSQL: set TEVA_POSTGRES_HOST, _DATABASE, "
                     "_USER and _PASSWORD."
                 )
         postgres = (
@@ -229,9 +227,9 @@ class Settings(BaseSettings):
             self.postgres_password.get_secret_value(),
         )
         if any(postgres) and not all(postgres):
-            raise ValueError("Set DELIVERY_POSTGRES_HOST, _DATABASE, _USER and _PASSWORD together.")
+            raise ValueError("Set TEVA_POSTGRES_HOST, _DATABASE, _USER and _PASSWORD together.")
         if self.ai_provider == "anthropic" and not self.anthropic_api_key.get_secret_value():
-            raise ValueError("DELIVERY_AI_PROVIDER=anthropic requires DELIVERY_ANTHROPIC_API_KEY.")
+            raise ValueError("TEVA_AI_PROVIDER=anthropic requires TEVA_ANTHROPIC_API_KEY.")
         return self
 
     @property

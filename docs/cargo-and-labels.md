@@ -17,7 +17,7 @@ is this service's job.
 
 ## Where the shipment comes from
 
-`DELIVERY_SHIPMENT_SOURCE` (or the settings screen) picks one of two ways.
+`TEVA_SHIPMENT_SOURCE` (or the settings screen) picks one of two ways.
 
 ### `konimbo` (the default)
 
@@ -47,7 +47,7 @@ service does not create the shipment; it sets that status and reads the number b
 ### `cargo`
 
 The service creates the shipment itself through `shipments/create`, from the order's
-address, phone and the shipping profile's Cargo customer code, once `DELIVERY_CARGO_WRITES`
+address, phone and the shipping profile's Cargo customer code, once `TEVA_CARGO_WRITES`
 is on. Each attempt is a row written before the request leaves and sent at most once. An
 attempt whose answer never came becomes *uncertain* and blocks any new attempt until a person
 checks Cargo and either links the shipment that was made or confirms that none was

@@ -14,9 +14,12 @@ from .support import START, build, make_settings
 
 @pytest.fixture(autouse=True)
 def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The service reads DELIVERY_* variables; a developer's own must not leak into tests."""
+    """The service reads TEVA_* variables; a developer's own must not leak into tests.
+
+    TEVA_TEST_* variables configure the tests themselves (the PostgreSQL URL) and stay.
+    """
     for name in list(os.environ):
-        if name.startswith("DELIVERY_"):
+        if name.startswith("TEVA_") and not name.startswith("TEVA_TEST_"):
             monkeypatch.delenv(name)
 
 

@@ -1,5 +1,5 @@
 # The warehouse service on the workspace network, where the frontend's nginx reaches it as
-# teva-delivery:8000 under /services/delivery/. Settings come from runtime.env (DELIVERY_*).
+# teva-delivery:8000 under /services/delivery/. Settings come from runtime.env (TEVA_*).
 services:
   delivery:
     build: ..
@@ -9,7 +9,7 @@ services:
       - path: ./runtime.env
         format: raw
     environment:
-      DELIVERY_MODE: ${DELIVERY_MODE:?Set live or demo mode}
+      TEVA_MODE: ${TEVA_MODE:?Set live or demo mode}
     volumes:
       - delivery-data:/data
     networks:

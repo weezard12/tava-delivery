@@ -60,18 +60,18 @@ class Overview:
         config = context.config()
         demo = context.demo
 
-        konimbo_missing = [] if providers.store else ["DELIVERY_KONIMBO_TOKEN"]
+        konimbo_missing = [] if providers.store else ["TEVA_KONIMBO_TOKEN"]
         cargo_missing: list[str] = []
         if providers.carrier is None:
-            cargo_missing.append("DELIVERY_CARGO_TOKEN")
+            cargo_missing.append("TEVA_CARGO_TOKEN")
         if not demo and config.shipment_source == "cargo":
             if not settings.cargo_configured:
-                cargo_missing.append("DELIVERY_CARGO_CUSTOMER_CODE_EXPRESS")
+                cargo_missing.append("TEVA_CARGO_CUSTOMER_CODE_EXPRESS")
             if not settings.cargo_sender_complete:
-                cargo_missing.append("DELIVERY_CARGO_FROM_*")
+                cargo_missing.append("TEVA_CARGO_FROM_*")
         printer_missing: list[str] = []
         if providers.printer is None:
-            printer_missing.append("DELIVERY_PRINTER_URL")
+            printer_missing.append("TEVA_PRINTER_URL")
         if not config.label_printer_id:
             printer_missing.append("label_printer_id")
         return InfoView(
@@ -91,11 +91,11 @@ class Overview:
             printer=Readiness(ready=context.can_print_labels, missing=printer_missing),
             speech=Readiness(
                 ready=providers.transcriber is not None,
-                missing=[] if providers.transcriber else ["DELIVERY_STT_URL"],
+                missing=[] if providers.transcriber else ["TEVA_STT_URL"],
             ),
             ai=Readiness(
                 ready=providers.interpreter is not None,
-                missing=[] if providers.interpreter else ["DELIVERY_AI_PROVIDER"],
+                missing=[] if providers.interpreter else ["TEVA_AI_PROVIDER"],
             ),
             auto_print=config.auto_print,
             require_label_print=config.require_label_print,

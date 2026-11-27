@@ -4,7 +4,7 @@
 
 - **demo** (the default): invented orders in an in-memory store, a fake Cargo and a fake
   printer, and a simulation of Konimbo's Cargo integration. Nothing leaves the process.
-  SQLite in `DELIVERY_DATA_DIR` unless PostgreSQL is configured. `DELIVERY_AUTH_DISABLED=true`
+  SQLite in `TEVA_DATA_DIR` unless PostgreSQL is configured. `TEVA_AUTH_DISABLED=true`
   is allowed here only, for local work and browser tests.
 - **live**: the real Konimbo store, Cargo, teva-printer, speech and AI, each only once it is
   configured; whatever is missing is shown on the screen (`GET /api/v1/info`). Requires the
@@ -12,7 +12,7 @@
 
 ## Settings
 
-Environment settings start with `DELIVERY_` (`core/config.py` documents each one). Secrets are
+Environment settings start with `TEVA_` (`core/config.py` documents each one). Secrets are
 never logged and never shown on the screen.
 
 | Group | Settings |
@@ -52,12 +52,12 @@ writes the `RUNTIME_ENV` secret to `deploy/runtime.env` and runs Compose:
 
 - `deploy/compose.yml`: the service, as `teva-delivery:8000` on the workspace network
   (`teva-<environment>`), data in the `delivery-data` volume.
-- `deploy/compose.database.yml`, added when `DELIVERY_POSTGRES_HOST` is set: joins the
+- `deploy/compose.database.yml`, added when `TEVA_POSTGRES_HOST` is set: joins the
   database network (`TEVA_DB_NETWORK`, default `teva-db`).
-- `deploy/compose.stt.yml`, added when `DELIVERY_STT_URL` is set: the speech service as
+- `deploy/compose.stt.yml`, added when `TEVA_STT_URL` is set: the speech service as
   `teva-delivery-stt:9000`. The first start downloads the model (about 1.6 GB) into the
   `stt-models` volume; until then voice falls back to the browser. Only
-  `DELIVERY_STT_TOKEN` is passed to it, as `STT_TOKEN`.
+  `TEVA_STT_TOKEN` is passed to it, as `STT_TOKEN`.
 
 GitHub environment secrets: `RUNTIME_ENV`, `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS`,
 `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET`, and optionally `DEPLOY_USER` and
@@ -73,27 +73,27 @@ process answers.
 Each step can be checked on the screen before the next one.
 
 1. **Database.** On the PostgreSQL server (`teva-postgres-postgres-1` on `teva-db`), create
-   a `delivery` user and database. Put `DELIVERY_POSTGRES_*` in `RUNTIME_ENV`.
+   a `delivery` user and database. Put `TEVA_POSTGRES_*` in `RUNTIME_ENV`.
 2. **Sign-in.** Generate a key of at least 32 characters. Set it as `TEVA_AUTH_DELIVERY_KEY`
-   in teva-media-master's runtime settings and as `DELIVERY_AUTH_SERVICE_KEY` here, with
-   `DELIVERY_AUTH_URL=http://teva-auth:8002`.
+   in teva-media-master's runtime settings and as `TEVA_AUTH_SERVICE_KEY` here, with
+   `TEVA_AUTH_URL=http://teva-auth:8002`.
 3. **Frontend.** Deploy teva-frontend with the warehouse module; its nginx sends
    `/services/delivery/` to `teva-delivery:8000`, WebSocket included.
 4. **Deploy in live mode** with only the above. The screen opens with an empty queue and says
    Konimbo, Cargo and the printer are not connected.
-5. **Konimbo, read only.** Add `DELIVERY_KONIMBO_TOKEN`; keep `DELIVERY_KONIMBO_WRITES=false`.
+5. **Konimbo, read only.** Add `TEVA_KONIMBO_TOKEN`; keep `TEVA_KONIMBO_WRITES=false`.
    On the settings screen press *Learn the store's statuses* and choose the exact names of the
    five categories, awaiting pickup, the warehouse note title (one that is not a store
    status) and the transmit status. Check that the queue shows the right orders. Packing works;
    every Konimbo write is recorded as *test mode*.
-6. **Cargo labels.** Add `DELIVERY_CARGO_TOKEN` and the customer codes. Set
-   `DELIVERY_PRINTER_URL=http://teva-printer:8000` and choose the label printer on the settings
+6. **Cargo labels.** Add `TEVA_CARGO_TOKEN` and the customer codes. Set
+   `TEVA_PRINTER_URL=http://teva-printer:8000` and choose the label printer on the settings
    screen. Link a real shipment by hand on a test order and print its label.
-7. **Writes.** Set `DELIVERY_KONIMBO_WRITES=true`. Pack one real order end to end and check in
+7. **Writes.** Set `TEVA_KONIMBO_WRITES=true`. Pack one real order end to end and check in
    Konimbo that the transmit status, the Cargo shipment and awaiting pickup appear. Only with
-   the `cargo` shipment source: `DELIVERY_CARGO_WRITES=true`.
-8. **Voice.** Set `DELIVERY_STT_URL=http://teva-delivery-stt:9000` and a `DELIVERY_STT_TOKEN`;
-   optionally `DELIVERY_AI_PROVIDER=anthropic` with `DELIVERY_ANTHROPIC_API_KEY`.
+   the `cargo` shipment source: `TEVA_CARGO_WRITES=true`.
+8. **Voice.** Set `TEVA_STT_URL=http://teva-delivery-stt:9000` and a `TEVA_STT_TOKEN`;
+   optionally `TEVA_AI_PROVIDER=anthropic` with `TEVA_ANTHROPIC_API_KEY`.
 
 ## Day to day
 

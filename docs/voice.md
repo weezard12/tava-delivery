@@ -22,8 +22,8 @@ decoded in memory and never stored; only the recognised sentence is kept, for
 - `POST /v1/transcribe?language=he` takes the raw recording (webm, ogg, wav or mp4) and
   answers `{text, confidence, duration, language}`.
 - `STT_DEVICE` (`cpu` or `cuda`), `STT_COMPUTE_TYPE` (`int8` on CPU) and `STT_TOKEN` (a shared
-  secret, set as `DELIVERY_STT_TOKEN` on the service) configure it.
-- Without `DELIVERY_STT_URL` the screen uses the browser's own speech recognition and sends the
+  secret, set as `TEVA_STT_TOKEN` on the service) configure it.
+- Without `TEVA_STT_URL` the screen uses the browser's own speech recognition and sends the
   text to `/voice/text`.
 
 A sentence recognised below `stt_min_confidence` (default 0.45) is asked again, not guessed.
@@ -71,7 +71,7 @@ products still open), and the answer says what was done and what was not.
 
 ## The AI fallback
 
-Optional (`DELIVERY_AI_PROVIDER=anthropic` and `DELIVERY_ANTHROPIC_API_KEY`). It is asked only
+Optional (`TEVA_AI_PROVIDER=anthropic` and `TEVA_ANTHROPIC_API_KEY`). It is asked only
 when the parser understood the kind of command but not which product or note was meant,
 usually a nickname, a colour or a size instead of the catalogue name.
 
@@ -88,4 +88,4 @@ usually a nickname, a colour or a size instead of the catalogue name.
 - A phrase the warehouse uses for a product can be saved as its nickname (`/aliases`), so
   the parser knows it next time without the AI.
 
-The model is `DELIVERY_AI_MODEL`; a smaller model answers faster and costs less.
+The model is `TEVA_AI_MODEL`; a smaller model answers faster and costs less.

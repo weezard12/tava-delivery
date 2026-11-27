@@ -1,11 +1,11 @@
-# Local Hebrew speech recognition. Loaded when runtime.env sets DELIVERY_STT_URL. The first
+# Local Hebrew speech recognition. Loaded when runtime.env sets TEVA_STT_URL. The first
 # start downloads the model (about 1.6 GB) into the stt-models volume.
 services:
   stt:
     build: ../stt
     restart: unless-stopped
     environment:
-      # The same value as DELIVERY_STT_TOKEN; the deploy job passes it on.
+      # The same value as TEVA_STT_TOKEN; the deploy job passes it on.
       STT_TOKEN: ${STT_TOKEN:-}
       STT_MODEL: ${STT_MODEL:-ivrit-ai/whisper-large-v3-turbo-ct2}
       STT_DEVICE: ${STT_DEVICE:-cpu}

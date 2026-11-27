@@ -12,7 +12,7 @@ and teva-printer (labels). Start with `docs/architecture.md`; `README.md` lists 
 
 ## Layout
 
-- `src/teva_delivery/core/` - settings (`DELIVERY_*`, `config.py`), logging, the clock.
+- `src/teva_delivery/core/` - settings (`TEVA_*`, `config.py`), logging, the clock.
 - `src/teva_delivery/domain/` - pure rules, no I/O: the Hebrew parser (`hebrew/`), notes,
   addresses, duplicates, packing transitions, error codes with their Hebrew messages
   (`errors.py`), provider ports (`ports.py`).
@@ -36,7 +36,7 @@ python -m ruff check && python -m ruff format --check
 python -m mypy src tests
 python -m pytest
 TEVA_TEST_POSTGRES_URL=postgresql+psycopg://user:password@host:5432/db python -m pytest -m postgres
-DELIVERY_AUTH_DISABLED=true python -m teva_delivery     # demo mode on :8000, docs at /api/docs
+TEVA_AUTH_DISABLED=true python -m teva_delivery     # demo mode on :8000, docs at /api/docs
 ```
 
 A schema change needs a migration in `persistence/migrations/versions/` that works on both

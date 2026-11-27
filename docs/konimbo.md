@@ -74,5 +74,5 @@ requests are left. The import status on the screen shows the requests left.
 
 ## Test mode
 
-Until `DELIVERY_KONIMBO_WRITES=true`, live mode reads Konimbo but writes nothing: each status
+Until `TEVA_KONIMBO_WRITES=true`, live mode reads Konimbo but writes nothing: each status
 or note job is recorded as *test mode* and finished without a request, and the screen says so.

@@ -37,7 +37,7 @@ fact, Cargo is the courier, and labels print through `teva-printer`. The screen 
 
 ```bash
 uv venv --python 3.15 && uv pip install -e ".[dev]"
-DELIVERY_AUTH_DISABLED=true python -m teva_delivery          # demo mode, http://localhost:8000
+TEVA_AUTH_DISABLED=true python -m teva_delivery          # demo mode, http://localhost:8000
 python -m pytest                                              # SQLite
 TEVA_TEST_POSTGRES_URL=postgresql+psycopg://user@host/db python -m pytest -m postgres
 python -m ruff check && python -m ruff format --check && python -m mypy src tests

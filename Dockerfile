@@ -9,7 +9,7 @@ FROM python:3.15-slim
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    DELIVERY_DATA_DIR=/data
+    TEVA_DATA_DIR=/data
 RUN useradd --system --uid 10001 --no-create-home delivery \
     && mkdir -p /data && chown delivery /data
 COPY --from=build /opt/venv /opt/venv
