@@ -18,6 +18,8 @@ dependencies = [
   "sqlalchemy>=2.0.58,<2.2",
   "tzdata>=2026.6",
   "uvicorn>=0.54,<1",
+  # Uvicorn serves WebSockets (the packing screen's live updates) only with this installed.
+  "websockets>=15,<18",
 ]
 
 [project.optional-dependencies]
