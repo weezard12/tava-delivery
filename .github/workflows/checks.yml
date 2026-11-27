@@ -18,7 +18,10 @@ permissions:
 jobs:
   verify:
     name: Lint, type check and test
-    runs-on: ubuntu-latest
+    # The workspace's own runners (Zoomies, label zoomies-ubuntu), as in teva-frontend. This
+    # repository is public, so a pull request from a fork runs on GitHub's runners instead and
+    # code from outside never reaches the local machines. The same rule is on every job below.
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'zoomies-ubuntu' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,7 +40,7 @@ jobs:
 
   postgres:
     name: Tests against PostgreSQL
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'zoomies-ubuntu' }}
     timeout-minutes: 15
     services:
       postgres:
@@ -67,7 +70,7 @@ jobs:
 
   image:
     name: Build and smoke-test the Docker image
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'zoomies-ubuntu' }}
     timeout-minutes: 20
     needs: [verify, postgres]
     steps:
@@ -120,7 +123,7 @@ jobs:
 
   stt:
     name: Build the speech recognition image
-    runs-on: ubuntu-latest
+    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'ubuntu-latest' || 'zoomies-ubuntu' }}
     timeout-minutes: 20
     needs: verify
     steps:
@@ -133,7 +136,7 @@ jobs:
     name: Deploy to the Docker server
     if: ((github.event_name == 'push' && !github.event.deleted && !github.event.created) || (github.event_name == 'workflow_dispatch' && inputs.deploy)) && contains(fromJSON('["main","master","dev","develop"]'), github.ref_name)
     needs: [image, stt]
-    runs-on: ubuntu-latest
+    runs-on: zoomies-ubuntu
     timeout-minutes: 20
     environment: ${{ contains(fromJSON('["main","master"]'), github.ref_name) && 'production' || 'staging' }}
     concurrency:
@@ -244,6 +247,7 @@ jobs:
             echo 'Live mode needs DELIVERY_AUTH_URL, DELIVERY_AUTH_SERVICE_KEY and DELIVERY_POSTGRES_* in RUNTIME_ENV.' >&2
             exit 1
           fi
+          # Zoomies sets DOCKER_HOST for CI. Clear it before deploying over SSH.
           unset DOCKER_HOST
           if ! timeout 30s docker --context rimon info --format 'Deployment Docker daemon {{.Name}}'; then
             echo '::error::Cannot reach the deployment Docker daemon through Cloudflare SSH. Check SSH and Docker socket access.'

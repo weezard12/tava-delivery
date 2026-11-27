@@ -41,6 +41,12 @@ in live mode; a push to `dev` deploys to **staging** in demo mode. *Run workflow
 *Deploy* does the same for the chosen branch. The first push that creates a branch does not
 deploy.
 
+The jobs run on the workspace's own runners (Zoomies, label `zoomies-ubuntu`), as teva-frontend's
+do. The repository is public, so a pull request from a fork runs on GitHub's runners instead:
+code from outside never runs on the local machines. Zoomies starts a fresh runner with its own
+Docker for each job and sets `DOCKER_HOST` to it; the deploy job clears it before it talks to
+the server over SSH.
+
 The deploy job reaches the Docker server over SSH through Cloudflare Access, like teva-printer,
 writes the `RUNTIME_ENV` secret to `deploy/runtime.env` and runs Compose:
 
