@@ -1,8 +1,9 @@
-"""Turns errors into the API's ``{"detail": code, "message": text}`` responses.
+"""Turns errors into the API's ``{"code": code, "detail": text}`` responses.
 
-``detail`` is the stable code the frontend switches on, as in teva-printer; ``message`` is the
-Hebrew text the employee sees. Anything unexpected is a bug: it is logged with the request ID
-and answered with a generic 500, never with internal details.
+``code`` is the stable code the frontend switches on, as in teva-ai; ``detail`` is the Hebrew
+text the employee sees, so the workspace's shared HTTP client shows it as it is. Anything
+unexpected is a bug: it is logged with the request ID and answered with a generic 500, never
+with internal details.
 """
 
 import logging
@@ -19,7 +20,7 @@ logger = logging.getLogger("teva_delivery.errors")
 
 def problem(code: str, status: int, message: str | None = None, **headers: str) -> JSONResponse:
     return JSONResponse(
-        {"detail": code, "message": message or message_for(code)},
+        {"code": code, "detail": message or message_for(code)},
         status_code=status,
         headers=headers or None,
     )

@@ -83,8 +83,8 @@ def test_health_needs_no_sign_in(client: TestClient) -> None:
 def test_every_api_call_needs_a_workspace_session(client: TestClient) -> None:
     response = client.get("/api/v1/info")
     assert response.status_code == 401
-    assert response.json()["detail"] == "invalid_session"
-    assert response.json()["message"]
+    assert response.json()["code"] == "invalid_session"
+    assert response.json()["detail"]
     forged = client.post("/api/v1/work/next", headers={**headers(), "X-CSRF-Token": "wrong"})
     assert forged.status_code == 403
 
@@ -98,7 +98,7 @@ def test_settings_are_for_admins(client: TestClient) -> None:
     unknown = client.patch(
         "/api/v1/settings", json={"changes": {"token": "x"}}, headers=headers(ADMIN_TOKEN)
     )
-    assert unknown.json()["detail"] == "settings_invalid"
+    assert unknown.json()["code"] == "settings_invalid"
 
 
 def test_packing_over_http(client: TestClient, clock: ManualClock) -> None:
@@ -139,20 +139,20 @@ def test_packing_over_http(client: TestClient, clock: ManualClock) -> None:
         path, json={"action": "print_shipping_label", "print_mode": "manual"}, headers=headers()
     )
     assert again.status_code == 409
-    assert again.json()["detail"] == "already_printed"
+    assert again.json()["code"] == "already_printed"
 
 
 def test_errors_carry_a_code_and_a_hebrew_message(client: TestClient) -> None:
     missing = client.get("/api/v1/fulfillments/9999", headers=headers())
     assert missing.status_code == 404
-    assert missing.json() == {"detail": "fulfillment_not_found", "message": "ההזמנה לא נמצאה."}
+    assert missing.json() == {"code": "fulfillment_not_found", "detail": "ההזמנה לא נמצאה."}
     invalid = client.post(
         "/api/v1/fulfillments/1/actions", json={"action": "launch_rocket"}, headers=headers()
     )
     assert invalid.status_code == 422
-    assert invalid.json()["detail"] == "request_invalid"
+    assert invalid.json()["code"] == "request_invalid"
     assert "launch_rocket" not in invalid.text
-    assert client.get("/api/v1/nothing-here", headers=headers()).json()["detail"] == "not_found"
+    assert client.get("/api/v1/nothing-here", headers=headers()).json()["code"] == "not_found"
 
 
 def test_voice_text_and_audio(client: TestClient) -> None:
@@ -168,7 +168,7 @@ def test_voice_text_and_audio(client: TestClient) -> None:
     files = {"audio": ("clip.webm", b"\x1a\x45\xdf\xa3", "audio/webm")}
     form = {"utterance_id": "utt-api-0002", "fulfillment_id": str(work["fulfillment"]["id"])}
     unavailable = client.post("/api/v1/voice/audio", files=files, data=form, headers=headers())
-    assert unavailable.json()["detail"] == "stt_not_configured"
+    assert unavailable.json()["code"] == "stt_not_configured"
 
     services(client).context.providers.transcriber = FakeTranscriber()
     heard = client.post("/api/v1/voice/audio", files=files, data=form, headers=headers()).json()
@@ -179,7 +179,7 @@ def test_shipment_numbers_are_digits(client: TestClient) -> None:
     response = client.post(
         "/api/v1/fulfillments/1/shipment/link", json={"number": "abc123"}, headers=headers()
     )
-    assert response.json()["detail"] == "request_invalid"
+    assert response.json()["code"] == "request_invalid"
 
 
 def test_duplicates_aliases_and_sync(client: TestClient) -> None:

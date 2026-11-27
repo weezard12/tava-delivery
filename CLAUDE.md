@@ -69,7 +69,7 @@ SQLite and PostgreSQL.
 - **Never commit a secret.** Keys reach the service through `deploy/runtime.env` (git ignores
   it), written from the `RUNTIME_ENV` secret in CI.
 - **Errors that reach a person carry a code** (`ServiceError(code)`, defined in
-  `domain/errors.py` with its Hebrew message). The API answers `{"detail": code, "message"}`.
+  `domain/errors.py` with its Hebrew message). The API answers `{"code": code, "detail": hebrew text}`.
 - **Time comes from the clock** (`context.now()`, `ManualClock` in tests), never
   `datetime.now()` in services.
 - **Hebrew user text, English code and docs.** Messages on the screen and spoken answers are
